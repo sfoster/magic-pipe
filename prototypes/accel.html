@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+  <meta charset="utf-8">
+  <style>
+    .mover {
+      position: absolute;
+      top: auto; left: 0; bottom: 0;
+      width: 10px; height: 10px;
+      border-radius: 5px;
+      border: 1px solid black;
+      transform: translate(0, 0);
+      will-change: transform;
+    }
+    #startStop {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      z-index: 10;
+      border-radius: 10px;
+      width: 100px;
+      padding: 1em 2em;
+      background-color: rgb(255,155,155);
+    }
+    #startStop.stopped {
+      background-color: rgb(155,255,155);
+    }
+    #sensor {
+      position: absolute;
+      top: 115px;
+      right: 5px;
+      width: 100px;
+      height: 100px;
+      z-index: 10;
+      border: 1px solid #999;
+      border-radius: 10px;
+      text-align: center;
+      background-color: rgb(179,205,255);
+      opacity: 0.6;
+    }
+    #sensor.stopped {
+      border: 1px solid #ccc;
+      background-color: rgb(233,233,233);
+      color: #ccc;
+    }
+    #sensor:not(.stopped):hover {
+      opacity: 1;
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      overflow: hidden;
+      height: 100%; width: 100%;
+    }
+  </style>
+  <script>
+    var DEBUG = false;
+    debug = {
+      log: function () {
+        if(!DEBUG) return;
+        var args = Array.from(arguments);
+        args.unshift('debug:')
+        return console.log.apply(console, args);
+      }
+    };
+  </script>
+  <script src="./vector.js"></script>
+  <script src="./keystate.js"></script>
+</head>
+<body>
+<button id="startStop">Start</button>
+<div id="sensor" class="stopped">sensor</div>
+<div id="protoMover" class="mover" style="display:none"></div>
+
+<script>
+var viewport = {
+  height: window.innerHeight -10,
+  width: window.innerWidth,
+};
+var aspectRatio = viewport.width / viewport.height;
+var renderScale = 1;
+var bounds = {
+  top: viewport.height,
+  right: viewport.width - 100,
+  left: 0,
+  bottom: 0,
+  within: function(pt) {
+    var isWithin = (pt.y <= this.top && pt.y >= this.bottom &&
+               pt.x <= this.right && pt.x >= this.left);
+    return isWithin;
+  }
+}
+
+var button = {
+  running: false,
+  element: document.getElementById('startStop'),
+  init: function() {
+    this.element.addEventListener('click', this);
+    this.toggle(false);
+  },
+  toggle: function(toValue) {
+    if (undefined === toValue) {
+      toValue = !this.running;
+    }
+    if (toValue) {
+      this.running = true;
+      this.element.classList.remove('stopped');
+      this.element.innerHTML = 'Stop';
+      start(4);
+    } else {
+      stop();
+      this.running = false;
+      this.element.classList.add('stopped');
+      this.element.innerHTML = 'Start';
+    }
+  },
+  handleEvent: function(evt) {
+    this.toggle();
+  }
+};
+
+var sensor = {
+  element: document.getElementById('sensor'),
+  start: function() {
+    this.element.addEventListener('mousemove', this);
+    this.element.addEventListener('mouseout', this);
+    KeyState.listen();
+    this.element.classList.remove('stopped');
+  },
+  stop: function() {
+    this.element.removeEventListener('mousemove', this);
+    this.element.removeEventListener('mouseout', this);
+    KeyState.stop();
+  },
+  handleEvent: function(evt) {
+    switch(evt.type) {
+      case 'mousemove':
+        this._lastUp = 1; // could have 0-1 or 0-255 value range?
+        break;
+      case 'mouseout':
+        this._lastUp = 0; // could have 0-1 or 0-255 value range?
+        break;
+    }
+  },
+  get up() {
+    return KeyState.up || this._lastUp;
+  },
+  get down() {
+    return KeyState.down;
+  }
+};
+
+var Force = {
+  Gravity: new Vector(0, -9, 0),
+  Nudge: new Vector(0, 18, 0)
+};
+
+var clock = {
+  _running: false,
+  onRAF: function(timestamp) {
+    if (this._running) {
+      this.onTick && this.onTick(timestamp - this.lastFrameTime);
+      this.lastFrameTime = timestamp;
+    }
+    if (this.continueCondition()) {
+      this.tick();
+    } else {
+      this.stop();
+    }
+  },
+  start: function(config) {
+    function _Animation(props) {
+      for (var key in props) this[key] = props[key];
+    }
+    _Animation.prototype = {
+      continueCondition: function() {},
+      onTick: function() {}
+    };
+    var animation = this.animation = new _Animation(config || {});
+    this._running = true;
+    this.startTime = window.performance.now();
+    this.lastFrameTime = this.startTime;
+    this.onTick = animation.onTick.bind(animation);
+    this.tick = requestAnimationFrame.bind(window, this.onRAF.bind(this));
+    this.continueCondition = function() {
+      return this._running && animation.continueCondition();
+    };
+    this.startTime = Date.now();
+    this._timerid = this.tick();
+  },
+  stop: function() {
+    this._timerid && cancelAnimationFrame(this._timerid);
+    this._running = this._timerid = false;
+  }
+};
+
+function Mover(x, y) {
+  this.acceleration = new Vector(0, 0);
+  this.velocity = new Vector(0);
+  this.location = new Vector(x, y); // initial position
+  var elm = document.getElementById('protoMover').cloneNode(true);
+  elm.style.display = 'block';
+  this.element = document.body.appendChild(elm);
+}
+Mover.prototype = {
+  location: null, // Vector
+  velocity: null, // Vector
+  acceleration: null, // Vector
+  maxspeed: 20.0, // float
+  responsiveness: 1, // float
+
+  applyForce: function(force) {
+    this.acceleration.add(force);
+  },
+
+  update: function(deltaMS) {
+    this.applyForce(Force.Gravity);
+    if (!this.nudge) {
+      this.nudge = Vector.multiply(Force.Gravity, -1 + this.responsiveness * -1);
+    }
+    if (sensor.up) {
+      this.applyForce(this.nudge);
+    }
+    if (sensor.down) {
+      this.applyForce(Vector.multiply(this.nudge, -0.5));
+    }
+    var deltaTime = deltaMS/1000;
+    var accel = Vector.multiply(this.acceleration, deltaTime);
+    // add the acceleration over time
+    this.velocity.add(accel);
+    this.velocity.clamp(-this.maxspeed, this.maxspeed);
+    this.location.add(this.velocity);
+    if (!bounds.within(this.location)) {
+      this.velocity = new Vector(0);
+      this.location.clamp(new Vector(0,0), new Vector(bounds.right, bounds.top));
+    }
+    debug.log('update velocity: ' + this.velocity);
+    this.acceleration.multiply(0);
+    this.render()
+  },
+
+  render: function() {
+    // Draw rotated in the direction of velocity
+    // var theta = this.velocity.heading2D() + radians(90);
+    // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
+    var style = this.element.style;
+    var top = Math.max(0, this.location.y) * renderScale * -1;
+    var left = Math.max(0, this.location.x * renderScale);
+    debug.log('rendering at: ' + this.location +', ' + this.velocity);
+    style.transform = 'translate(' + left + 'px, ' + top + 'px)';
+    var blue = Math.round(Math.abs(this.velocity.y) / 40 * 255);
+    var red = Math.round(blue / 2);
+    var green = Math.round(blue / 2);
+    style.backgroundColor = 'rgb('+red+', '+green+', '+blue+ ')';
+  }
+}
+
+var gRunning = false;
+function start(howMany) {
+  stop();
+  sensor.start();
+  howMany = howMany || 1;
+  gRunning = true;
+  var movers = window.movers = [];
+  var mover, resp, maxspeed, x, y;
+  for (var i = 0; i < howMany; i++) {
+    resp = Math.random() + 0.3;
+    x = Math.random() * bounds.right;
+    y = Math.random() * bounds.top;
+    // maxspeed = Math.random() * 40;
+    mover = new Mover(x,y);
+    mover.responsiveness = resp;
+    movers.push(mover);
+  }
+  clock.start({
+    onTick: function(deltaTime) {
+      movers.forEach(function(mover) {
+        mover.update(deltaTime);
+      });
+    },
+    continueCondition: function() {
+      return (movers.length && gRunning === true);
+    }
+  });
+}
+
+function stop() {
+  sensor.stop();
+  clock.stop();
+}
+
+button.init();
+</script>
+</body>
+</html>
