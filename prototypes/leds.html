@@ -73,7 +73,7 @@
   <script src="./vector.js"></script>
   <script src="./keystate.js"></script>
   <script src="./clock.js"></script>
-  <script src="./mover.js"></script>
+  <script src="./mover2d.js"></script>
 </head>
 <body>
 <button id="startStop">Start</button>
@@ -160,7 +160,7 @@ var Force = {
 
 var clock = new Clock();
 
-function Led(moverSource) {
+function Led() {
   var elm = document.getElementById('protoLed').cloneNode(true);
   elm.style.display = 'block';
   elm.id = 'led-' + (Led._count++);
@@ -191,18 +191,18 @@ function start() {
   howMany = 4;
   gRunning = true;
   var actors = window.actors = [];
-  var options = { bounds: bounds };
+  var options = { bounds: bounds, input: sensor };
   // slow one
-  actors[0] = new Mover(0,40, options);
+  actors[0] = new Mover2d(0,40, options);
   actors[0].responsiveness = 0.3
   // medium one
-  actors[1] = new Mover(0,0, options);
+  actors[1] = new Mover2d(0,0, options);
   actors[1].responsiveness = 0.5
   // fast one
-  actors[2] = new Mover(0,0, options);
+  actors[2] = new Mover2d(0,0, options);
   actors[2].responsiveness = 0.8
   // really slow one
-  actors[3] = new Mover(0,0, options);
+  actors[3] = new Mover2d(0,0, options);
   actors[3].responsiveness = 0.15
 
   var emberLed = new Led();

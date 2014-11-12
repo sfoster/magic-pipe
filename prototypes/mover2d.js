@@ -1,5 +1,5 @@
 (function(exports) {
-  function Mover(x, y, options) {
+  function Mover2d(x, y, options) {
     options = options || {};
     this.bounds = options.bounds;
     this.input = options.input;
@@ -7,7 +7,7 @@
     this.velocity = new Vector(0);
     this.location = new Vector(x, y); // initial position
   }
-  Mover.prototype = {
+  Mover2d.prototype = {
     location: null, // Vector
     velocity: null, // Vector
     acceleration: null, // Vector
@@ -49,5 +49,5 @@
     }
   };
 
-  exports.Mover = Mover;
+  exports.Mover2d = Mover2d;
 })(window);

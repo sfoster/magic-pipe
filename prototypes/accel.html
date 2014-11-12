@@ -68,7 +68,7 @@
   <script src="./vector.js"></script>
   <script src="./keystate.js"></script>
   <script src="./clock.js"></script>
-  <script src="./mover.js"></script>
+  <script src="./mover2d.js"></script>
 </head>
 <body>
 <button id="startStop">Start</button>
@@ -160,7 +160,7 @@ var Force = {
 
 var clock = new Clock();
 
-Mover.prototype.render = function() {
+Mover2d.prototype.render = function() {
   // Draw rotated in the direction of velocity
   // var theta = this.velocity.heading2D() + radians(90);
   // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
@@ -192,7 +192,7 @@ function start(howMany) {
     x = Math.random() * bounds.right;
     y = Math.random() * bounds.top;
     // maxspeed = Math.random() * 40;
-    mover = new Mover(x,y, options);
+    mover = new Mover2d(x,y, options);
 
     elm = document.getElementById('protoMover').cloneNode(true);
     elm.style.display = 'block';
