@@ -70,10 +70,9 @@
       }
     };
   </script>
-  <script src="./vector.js"></script>
   <script src="./keystate.js"></script>
   <script src="./clock.js"></script>
-  <script src="./mover2d.js"></script>
+  <script src="./mover.js"></script>
 </head>
 <body>
 <button id="startStop">Start</button>
@@ -88,8 +87,7 @@ var bounds = {
   left: 0,
   bottom: 0,
   within: function(pt) {
-    var isWithin = (pt.y <= this.top && pt.y >= this.bottom &&
-               pt.x <= this.right && pt.x >= this.left);
+    var isWithin = (pt <= this.top && pt >= this.bottom);
     return isWithin;
   }
 }
@@ -154,8 +152,8 @@ var sensor = {
 };
 
 var Force = {
-  Gravity: new Vector(0, -9, 0),
-  Nudge: new Vector(0, 18, 0)
+  Gravity: -9,
+  Nudge: 18
 };
 
 var clock = new Clock();
@@ -193,22 +191,22 @@ function start() {
   var actors = window.actors = [];
   var options = { bounds: bounds, input: sensor };
   // slow one
-  actors[0] = new Mover2d(0,40, options);
+  actors[0] = new Mover(40, options);
   actors[0].responsiveness = 0.3
   // medium one
-  actors[1] = new Mover2d(0,0, options);
+  actors[1] = new Mover(0, options);
   actors[1].responsiveness = 0.5
   // fast one
-  actors[2] = new Mover2d(0,0, options);
+  actors[2] = new Mover(0, options);
   actors[2].responsiveness = 0.8
   // really slow one
-  actors[3] = new Mover2d(0,0, options);
+  actors[3] = new Mover(0, options);
   actors[3].responsiveness = 0.15
 
   var emberLed = new Led();
   emberLed.update = function() {
-    this.red =    Math.max(177, actors[1].location.y / bounds.top * 255);
-    this.green =  51 + 100 * Math.sin(actors[3].location.y/bounds.top);
+    this.red =    Math.max(177, actors[1].value / bounds.top * 255);
+    this.green =  51 + 100 * Math.sin(actors[3].value/bounds.top);
   };
   actors.push(emberLed);
 
@@ -217,7 +215,7 @@ function start() {
   blueFlasher.latchTime = 0;
   blueFlasher.blinkTime = 300;
   blueFlasher.update = function(deltaTime) {
-    var peak = bounds.top - actors[3].location.y;
+    var peak = bounds.top - actors[3].value;
     if (peak >= 5) {
       this.state = 'off';
     }
