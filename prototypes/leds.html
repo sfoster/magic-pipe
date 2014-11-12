@@ -73,6 +73,7 @@
   <script src="./vector.js"></script>
   <script src="./keystate.js"></script>
   <script src="./clock.js"></script>
+  <script src="./mover.js"></script>
 </head>
 <body>
 <button id="startStop">Start</button>
@@ -182,49 +183,6 @@ Led.prototype = {
   }
 };
 
-function Mover(x, y) {
-  this.acceleration = new Vector(0, 0);
-  this.velocity = new Vector(0);
-  this.location = new Vector(x, y); // initial position
-}
-Mover.prototype = {
-  location: null, // Vector
-  velocity: null, // Vector
-  acceleration: null, // Vector
-  maxspeed: 20.0, // float
-  responsiveness: 1, // float
-
-  applyForce: function(force) {
-    this.acceleration.add(force);
-  },
-  update: function(deltaMS) {
-    this.applyForce(Force.Gravity);
-    if (!this.nudge) {
-      this.nudge = Vector.multiply(Force.Gravity, -1 + this.responsiveness * -1);
-    }
-    if (sensor.up) {
-      this.applyForce(this.nudge);
-    }
-    if (sensor.down) {
-      this.applyForce(Vector.multiply(this.nudge, -0.5));
-    }
-    var deltaTime = deltaMS/1000;
-    var accel = Vector.multiply(this.acceleration, deltaTime);
-    // add the acceleration over time
-    this.velocity.add(accel);
-    this.velocity.clamp(-this.maxspeed, this.maxspeed);
-    this.location.add(this.velocity);
-    if (!bounds.within(this.location)) {
-      this.velocity = new Vector(0);
-      this.location.clamp(new Vector(0,0), new Vector(bounds.right, bounds.top));
-    }
-    debug.log('update velocity: ' + this.velocity);
-    this.acceleration.multiply(0);
-  },
-  render: function() {
-    // stub
-  }
-};
 
 var gRunning = false;
 function start() {
@@ -233,17 +191,18 @@ function start() {
   howMany = 4;
   gRunning = true;
   var actors = window.actors = [];
+  var options = { bounds: bounds };
   // slow one
-  actors[0] = new Mover(0,40);
+  actors[0] = new Mover(0,40, options);
   actors[0].responsiveness = 0.3
   // medium one
-  actors[1] = new Mover(0,0);
+  actors[1] = new Mover(0,0, options);
   actors[1].responsiveness = 0.5
   // fast one
-  actors[2] = new Mover(0,0);
+  actors[2] = new Mover(0,0, options);
   actors[2].responsiveness = 0.8
   // really slow one
-  actors[3] = new Mover(0,0);
+  actors[3] = new Mover(0,0, options);
   actors[3].responsiveness = 0.15
 
   var emberLed = new Led();

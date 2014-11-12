@@ -68,6 +68,7 @@
   <script src="./vector.js"></script>
   <script src="./keystate.js"></script>
   <script src="./clock.js"></script>
+  <script src="./mover.js"></script>
 </head>
 <body>
 <button id="startStop">Start</button>
@@ -159,66 +160,20 @@ var Force = {
 
 var clock = new Clock();
 
-function Mover(x, y) {
-  this.acceleration = new Vector(0, 0);
-  this.velocity = new Vector(0);
-  this.location = new Vector(x, y); // initial position
-  var elm = document.getElementById('protoMover').cloneNode(true);
-  elm.style.display = 'block';
-  this.element = document.body.appendChild(elm);
-}
-Mover.prototype = {
-  location: null, // Vector
-  velocity: null, // Vector
-  acceleration: null, // Vector
-  maxspeed: 20.0, // float
-  responsiveness: 1, // float
-
-  applyForce: function(force) {
-    this.acceleration.add(force);
-  },
-
-  update: function(deltaMS) {
-    this.applyForce(Force.Gravity);
-    if (!this.nudge) {
-      this.nudge = Vector.multiply(Force.Gravity, -1 + this.responsiveness * -1);
-    }
-    if (sensor.up) {
-      this.applyForce(this.nudge);
-    }
-    if (sensor.down) {
-      this.applyForce(Vector.multiply(this.nudge, -0.5));
-    }
-    var deltaTime = deltaMS/1000;
-    var accel = Vector.multiply(this.acceleration, deltaTime);
-    // add the acceleration over time
-    this.velocity.add(accel);
-    this.velocity.clamp(-this.maxspeed, this.maxspeed);
-    this.location.add(this.velocity);
-    if (!bounds.within(this.location)) {
-      this.velocity = new Vector(0);
-      this.location.clamp(new Vector(0,0), new Vector(bounds.right, bounds.top));
-    }
-    debug.log('update velocity: ' + this.velocity);
-    this.acceleration.multiply(0);
-    this.render()
-  },
-
-  render: function() {
-    // Draw rotated in the direction of velocity
-    // var theta = this.velocity.heading2D() + radians(90);
-    // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
-    var style = this.element.style;
-    var top = Math.max(0, this.location.y) * renderScale * -1;
-    var left = Math.max(0, this.location.x * renderScale);
-    debug.log('rendering at: ' + this.location +', ' + this.velocity);
-    style.transform = 'translate(' + left + 'px, ' + top + 'px)';
-    var blue = Math.round(Math.abs(this.velocity.y) / 40 * 255);
-    var red = Math.round(blue / 2);
-    var green = Math.round(blue / 2);
-    style.backgroundColor = 'rgb('+red+', '+green+', '+blue+ ')';
-  }
-}
+Mover.prototype.render = function() {
+  // Draw rotated in the direction of velocity
+  // var theta = this.velocity.heading2D() + radians(90);
+  // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
+  var style = this.element.style;
+  var top = Math.max(0, this.location.y) * renderScale * -1;
+  var left = Math.max(0, this.location.x * renderScale);
+  debug.log('rendering at: ' + this.location +', ' + this.velocity);
+  style.transform = 'translate(' + left + 'px, ' + top + 'px)';
+  var blue = Math.round(Math.abs(this.velocity.y) / 40 * 255);
+  var red = Math.round(blue / 2);
+  var green = Math.round(blue / 2);
+  style.backgroundColor = 'rgb('+red+', '+green+', '+blue+ ')';
+};
 
 var gRunning = false;
 function start(howMany) {
@@ -227,13 +182,23 @@ function start(howMany) {
   howMany = howMany || 1;
   gRunning = true;
   var movers = window.movers = [];
-  var mover, resp, maxspeed, x, y;
+  var mover, resp, maxspeed, x, y, elm;
+  var options = {
+    bounds: bounds,
+    input: sensor
+  };
   for (var i = 0; i < howMany; i++) {
     resp = Math.random() + 0.3;
     x = Math.random() * bounds.right;
     y = Math.random() * bounds.top;
     // maxspeed = Math.random() * 40;
-    mover = new Mover(x,y);
+    mover = new Mover(x,y, options);
+
+    elm = document.getElementById('protoMover').cloneNode(true);
+    elm.style.display = 'block';
+    elm.id = 'dot-' + i;
+    mover.element = document.body.appendChild(elm);
+
     mover.responsiveness = resp;
     movers.push(mover);
   }
@@ -241,6 +206,7 @@ function start(howMany) {
     onTick: function(deltaTime) {
       movers.forEach(function(mover) {
         mover.update(deltaTime);
+        mover.render();
       });
     },
     continueCondition: function() {
