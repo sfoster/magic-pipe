@@ -9,7 +9,9 @@
     this.acceleration = 0;
     this.velocity = 0;
     this.value = value; // initial position
+    this.id = 'mover_' + (Mover._count++);
   }
+  Mover._count = 0;
   Mover.prototype = {
     value: 0,
     velocity: 0,
@@ -48,6 +50,16 @@
     },
     render: function() {
       // stub
+      if ( this.element) {
+        var style = this.element.style;
+        var renderScale = this.renderScale || 1;
+        var top = Math.max(0, this.value) * renderScale * -1;
+        style.transform = 'translate(0px, ' + top + 'px)';
+        var blue = Math.round(Math.abs(this.velocity) / 40 * 255);
+        var red = Math.round(blue / 2);
+        var green = Math.round(blue / 2);
+        style.backgroundColor = 'rgb('+red+', '+green+', '+blue+ ')';
+      }
     }
   };
 

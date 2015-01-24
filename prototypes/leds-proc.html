@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      overflow: hidden;
+      height: 100%; width: 100%;
+    }
+    .mover {
+      position: absolute;
+      top: auto; left: 0; bottom: 0;
+      width: 10px; height: 10px;
+      border-radius: 5px;
+      border: 1px solid black;
+      transform: translate(0, 0);
+      will-change: transform;
+    }
+    .led {
+      position: absolute;
+      top: 0; left: 0;
+      width: 10px; height: 10px;
+      border-radius: 10px;
+      border: 1px outset black;
+      transform: translate(0, 0);
+      will-change: transform;
+    }
+    #startStop {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      z-index: 10;
+      border-radius: 10px;
+      width: 100px;
+      padding: 1em 2em;
+      background-color: rgb(255,155,155);
+    }
+    #startStop.stopped {
+      background-color: rgb(155,255,155);
+    }
+    #sensor {
+      position: absolute;
+      top: 115px;
+      right: 5px;
+      width: 100px;
+      height: 100px;
+      z-index: 10;
+      border: 1px solid #999;
+      border-radius: 10px;
+      text-align: center;
+      background-color: rgb(179,205,255);
+      opacity: 0.6;
+    }
+    #sensor.stopped {
+      border: 1px solid #ccc;
+      background-color: rgb(233,233,233);
+      color: #ccc;
+    }
+    #sensor:not(.stopped):hover {
+      opacity: 1;
+    }
+    #led-0, #ember {
+      left: 30px; top: 30px;
+    }
+    #led-1, #blue {
+      left: 60px; top: 30px;
+    }
+    #mover_0 {
+      left: 30px;
+    }
+    #mover_1 {
+      left: 60px;
+    }
+    #mover_2 {
+      left: 90px;
+    }
+    #mover_3 {
+      left: 120px;
+    }
+  </style>
+  <script>
+    var DEBUG = false;
+    debug = {
+      log: function () {
+        if(!DEBUG) return;
+        var args = Array.from(arguments);
+        args.unshift('debug:')
+        return console.log.apply(console, args);
+      }
+    };
+  </script>
+  <script src="./keystate.js"></script>
+  <script src="./clock.js"></script>
+  <script src="./mover.js"></script>
+</head>
+<body>
+<button id="startStop">Start</button>
+<div id="sensor" class="stopped">sensor</div>
+<div id="protoLed" class="led" style="display:none"></div>
+<div id="protoMover" class="mover" style="display:none"></div>
+
+<script>
+// some imaginary 2d space
+var bounds = {
+  top: 600,
+  right: 100,
+  left: 0,
+  bottom: 0,
+  within: function(pt) {
+    var isWithin = (pt <= this.top && pt >= this.bottom);
+    return isWithin;
+  }
+}
+
+function initButton(button) {
+  button.element.addEventListener('click', button);
+  toggleButton(button, false);
+}
+function toggleButton(button, toValue) {
+  if (undefined === toValue) {
+    toValue = !button.running;
+  }
+  if (toValue) {
+    button.running = true;
+    button.element.classList.remove('stopped');
+    button.element.innerHTML = 'Stop';
+    start(4);
+  } else {
+    stop();
+    button.running = false;
+    button.element.classList.add('stopped');
+    button.element.innerHTML = 'Start';
+  }
+}
+
+var button = {
+  running: false,
+  element: document.getElementById('startStop'),
+  handleEvent: function(evt) {
+    toggleButton(this);
+  }
+};
+
+function startSensor(sensor) {
+    sensor.element.addEventListener('mousemove', sensor);
+    sensor.element.addEventListener('mouseout', sensor);
+    KeyState.listen();
+    sensor.element.classList.remove('stopped');
+}
+
+function stopSensor(sensor) {
+    sensor.element.removeEventListener('mousemove', sensor);
+    sensor.element.removeEventListener('mouseout', sensor);
+    KeyState.stop();
+}
+
+var sensor = {
+  _lastUp: 0,
+  element: document.getElementById('sensor'),
+  handleEvent: function(evt) {
+    switch(evt.type) {
+      case 'mousemove':
+        this._lastUp = 1; // could have 0-1 or 0-255 value range?
+        break;
+      case 'mouseout':
+        this._lastUp = 0; // could have 0-1 or 0-255 value range?
+        break;
+    }
+  },
+  get up() {
+    return KeyState.up || this._lastUp;
+  },
+  get down() {
+    return KeyState.down;
+  }
+};
+
+var Force = {
+  Gravity: -9,
+  Nudge: 18
+};
+
+var clock = new Clock();
+
+function updateActor(actor, deltaTime) {
+  if (actor.id.contains('mover')) {
+    // updateMover(actor, deltaTime)
+    actor.update(deltaTime);
+  }
+  else if (actor.id.contains('led')) {
+    updateLed(actor, deltaTime);
+  }
+  else if (actor.id.contains('ember')) {
+    actor.red =    Math.max(177, actors[1].value / bounds.top * 255);
+    actor.green =  51 + 100 * Math.sin(actors[3].value/bounds.top);
+  }
+  else if (actor.id.contains('blue')) {
+    updateBlueFlasher(actor, deltaTime);
+  }
+}
+
+function createMoverRendering(mover) {
+  var elm = document.getElementById('protoMover').cloneNode(true);
+  elm.style.display = 'block';
+  elm.id = mover.id;
+  mover.element = document.body.appendChild(elm);
+  return mover.element;
+}
+
+function renderActor(actor) {
+  if (actor.id.contains('mover')) {
+    // updateMover(actor, deltaTime)
+    actor.render();
+  }
+  else if (
+      actor.id.contains('led') ||
+      actor.id.contains('ember') ||
+      actor.id.contains('blue')
+  ) {
+    renderLed(actor);
+  }
+}
+
+function renderLed(led) {
+  var colorStr = 'rgb('+
+    Math.round(led.red) +', '+
+    Math.round(led.green) +', '+
+    Math.round(led.blue) +
+  ')';
+  led.element.style.backgroundColor = colorStr;
+}
+
+function makeLed(id) {
+  id = id || 'led-' + (Led_count++);
+  var elm = document.getElementById('protoLed').cloneNode(true);
+  elm.style.display = 'block';
+  elm.id = id;
+  return {
+    id: id,
+    element: document.body.appendChild(elm),
+    red: 0,
+    green: 0,
+    blue: 0,
+  }
+}
+Led_count = 0;
+
+
+function updateBlueFlasher(led, deltaTime) {
+  var peak = bounds.top - actors[3].value;
+  if (peak >= 5) {
+    led.state = 'off';
+  }
+  switch (led.state) {
+    case 'off':
+      if (peak < 5) {
+        led.state = 'blink-on';
+        led.latchTime = led.blinkTime;
+      }
+      led.red =  0;
+      led.green =  0;
+      led.blue =  0;
+      break;
+    case 'blink-on':
+      led.latchTime = Math.max(0, led.latchTime - deltaTime);
+      led.red =  0;
+      led.green =  153;
+      led.blue =  255;
+      if (led.latchTime == 0) {
+        led.state = 'blink-off';
+        led.latchTime = led.blinkTime;
+      }
+      break;
+    case 'blink-off':
+      led.latchTime = Math.max(0, led.latchTime - deltaTime);
+      led.red =  0;
+      led.green =  0;
+      led.blue =  100;
+      if (led.latchTime == 0) {
+        led.state = 'blink-on';
+        led.latchTime = led.blinkTime;
+      }
+      break;
+  }
+}
+
+var gRunning = false;
+function start() {
+  stop();
+  console.log('starting');
+  startSensor(sensor);
+  howMany = 4;
+  gRunning = true;
+  var actors = window.actors = [];
+  var options = { bounds: bounds, input: sensor };
+  var elm;
+  // slow one
+  actors[0] = new Mover(40, options);
+  actors[0].responsiveness = 0.3
+  createMoverRendering(actors[0]);
+
+  // medium one
+  actors[1] = new Mover(0, options);
+  actors[1].responsiveness = 0.5
+  createMoverRendering(actors[1]);
+
+  // fast one
+  actors[2] = new Mover(0, options);
+  actors[2].responsiveness = 0.8
+  createMoverRendering(actors[2]);
+
+  // really slow one
+  actors[3] = new Mover(0, options);
+  actors[3].responsiveness = 0.15
+  createMoverRendering(actors[3]);
+
+  console.log('starting, created movers: ', actors.slice(0, 3));
+  var emberLed = makeLed('ember');
+  actors.push(emberLed);
+
+  var blueFlasher = makeLed('blue');
+  blueFlasher.state = 'off'; // blink-on, blink-off
+  blueFlasher.latchTime = 0;
+  blueFlasher.blinkTime = 300;
+  actors.push(blueFlasher);
+
+  clock.start({
+    onTick: function(deltaTime) {
+      actors.forEach(function(actor) {
+        updateActor(actor, deltaTime);
+        renderActor(actor);
+      });
+    },
+    continueCondition: function() {
+      return (actors.length && gRunning === true);
+    }
+  });
+}
+
+function stop() {
+  stopSensor(sensor);
+  clock.stop();
+}
+
+initButton(button);
+</script>
+</body>
+</html>
